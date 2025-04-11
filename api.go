@@ -42,6 +42,7 @@ func NewAPIServer(listenAddr string) *APIServer{
 	}
 }
 
+///server run function
 func (s *APIServer) Run(){
 	router := mux.NewRouter()
 
@@ -55,6 +56,7 @@ func (s *APIServer) Run(){
 	http.ListenAndServe(s.listenAddr, router)
 }
 
+//handle all account function "GET", "POST", "DELETE"
 func (s *APIServer) handleAccount(w http.ResponseWriter, r *http.Request) error{
 
 	switch r.Method {

@@ -2,6 +2,7 @@ package main
 
 import "math/rand"
 
+//@params `json:` changes json property
 type Account struct {
 	ID int `json:"id"`
 	FirstName string `json:"firstName"`

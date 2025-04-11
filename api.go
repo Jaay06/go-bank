@@ -35,6 +35,7 @@ type APIServer struct {
 	listenAddr string
 }
 
+//api server
 func NewAPIServer(listenAddr string) *APIServer{
 	return &APIServer{
 		listenAddr: listenAddr,
@@ -75,7 +76,7 @@ func (s *APIServer) handleGetAccount(w http.ResponseWriter, r *http.Request) err
 	// account := NewAccount("Jaay", "Tee")
 	fmt.Println(id)
 
-	
+
 	return WriteJSON(w, http.StatusOK, &Account{})
 }
 

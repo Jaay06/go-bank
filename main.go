@@ -9,8 +9,13 @@ func main(){
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	if err := store.Init(); err != nil{
+		log.Fatal(err)
+	}
+
 	// test if server is active
-	//fmt.Printf("%+v\n", store)
+	// fmt.Printf("%+v\n", store)
 
 	server := NewAPIServer(":3000", store)
 	server.Run()

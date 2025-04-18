@@ -3,10 +3,8 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 
-	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
@@ -22,12 +20,6 @@ type PostgresStore struct {
 	db *sql.DB
 }
 
-func LoadEnv () {
-	err :=godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-}
 
 func NewPostgresStore() (*PostgresStore, error){
 
@@ -95,11 +87,20 @@ func (s *PostgresStore) UpdateAccount(*Account)error{
 }
 
 func (s *PostgresStore) DeleteAccount(id int)error{
-	return nil
+	_, err := s.db.Query("delete from account where id =  $1", id)
+	return err
 }
 
 func (s *PostgresStore) GetAccountByID(id int) (*Account, error){
-	return nil, nil
+	rows, err := s.db.Query("select * from account where id = $1", id)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next(){
+
+		return scanIntoAccount(rows)
+	}
+	return nil, fmt.Errorf("account %d not found", id)
 }
 func (s *PostgresStore) GetAccounts() ([]*Account, error){
 	rows, err := s.db.Query("select * from account")
@@ -111,18 +112,8 @@ func (s *PostgresStore) GetAccounts() ([]*Account, error){
 	accounts := []*Account{}
 
 	for rows.Next() {
-		account := new(Account)
-		err := rows.Scan(
-			&account.ID, 
-			&account.FirstName,
-			&account.LastName,
-			&account.Number,
-			&account.Balance,
-			&account.CreatedAt,
-
-			)
-			
-			if err != nil {
+		account, err := scanIntoAccount(rows)
+		if err != nil {
 			return nil, err
 		}
 		accounts = append(accounts, account)
@@ -130,4 +121,19 @@ func (s *PostgresStore) GetAccounts() ([]*Account, error){
 
 	return accounts, nil
 
+}
+
+func scanIntoAccount(rows *sql.Rows) (*Account, error) {
+	account := new(Account)
+		err := rows.Scan(
+			&account.ID, 
+			&account.FirstName,
+			&account.LastName,
+			&account.Number,
+			&account.Balance,
+			&account.CreatedAt,
+			)
+			
+
+			return account, err
 }

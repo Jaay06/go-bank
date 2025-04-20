@@ -32,6 +32,8 @@ func NewAPIServer(listenAddr string, store Storage) *APIServer{
 func (s *APIServer) Run(){
 	router := mux.NewRouter()
 
+	router.HandleFunc("/login", makeHTTPHandleFunc(s.handleLogin))
+
 	router.HandleFunc("/account", makeHTTPHandleFunc(s.handleAccount))
 
 	router.HandleFunc("/account/{id}", withJWTAuth(makeHTTPHandleFunc(s.handleGetAccountByID), s.store))
@@ -56,6 +58,44 @@ func (s *APIServer) handleAccount(w http.ResponseWriter, r *http.Request) error{
 	default: http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	return nil
 	}
+	
+}
+
+func (s *APIServer) handleLogin(w http.ResponseWriter, r *http.Request) error{
+
+	if r.Method != "POST" {
+		return fmt.Errorf("method not allowed %s", r.Method)
+	}
+
+	var req LoginRequest
+	if err :=json.NewDecoder(r.Body).Decode(&req); err != nil {
+	return err
+	}
+
+	acc, err := s.store.GetAccountByNumber(int(req.Number))
+
+	if err != nil {
+		return err //handle this response as json
+	}
+
+	if !acc.ValidatePassword(req.Password){
+		return fmt.Errorf("not authenticated")
+	}
+
+	//create JWT
+	token, err := createJWT(acc)
+	if err != nil {
+		return err
+	}
+
+	response := LoginResponse{
+		Token: token,
+		Number: acc.Number,
+	}
+
+
+
+return WriteJSON(w, http.StatusOK, response)
 	
 }
 
@@ -97,23 +137,20 @@ func (s *APIServer) handleGetAccountByID(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) error{
-	createAccountReq := new(CreateAccountRequest)
+	req := new(CreateAccountRequest)
 	// createAccountReq := CreateAccountRequest{}
-	if err := json.NewDecoder(r.Body).Decode(createAccountReq); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		return err
-	}
-	account := NewAccount(createAccountReq.FirstName, createAccountReq.LastName)
+	};
 
-	if err := s.store.CreateAccount(account); err != nil {
-		return err
-	}
-
-	tokenString, err := createJWT(account)
+	account, err := NewAccount(req.FirstName, req.LastName, req.Password)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("JWT token:",tokenString)
+	if err := s.store.CreateAccount(account); err != nil {
+		return err
+	}
 
 	return WriteJSON(w, http.StatusOK, account)
 }
@@ -175,7 +212,6 @@ func permissionDeniend(w http.ResponseWriter) {
 func withJWTAuth(handlerFunc http.HandlerFunc, s Storage) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request){
-	fmt.Println("calling JWT auth middleware")
 
 	tokenString := r.Header.Get("x-jwt-token")
 
@@ -206,7 +242,7 @@ func withJWTAuth(handlerFunc http.HandlerFunc, s Storage) http.HandlerFunc {
 
 	claims := token.Claims.(jwt.MapClaims)
 
-	if account.Number != int64(claims["accountNumber"].(float64)){
+	if account.Number != int64(claims["accountNumber"].(float64)){ //converts the clamims account number from float^4 to int 64
 		permissionDeniend(w)
 		return
 	}

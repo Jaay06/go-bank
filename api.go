@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
 )
 
@@ -31,7 +34,7 @@ func (s *APIServer) Run(){
 
 	router.HandleFunc("/account", makeHTTPHandleFunc(s.handleAccount))
 
-	router.HandleFunc("/account/{id}", makeHTTPHandleFunc(s.handleGetAccountByID))
+	router.HandleFunc("/account/{id}", withJWTAuth(makeHTTPHandleFunc(s.handleGetAccountByID), s.store))
 
 	router.HandleFunc("/transfer", makeHTTPHandleFunc(s.handleTransfer))
 
@@ -104,6 +107,14 @@ func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) 
 	if err := s.store.CreateAccount(account); err != nil {
 		return err
 	}
+
+	tokenString, err := createJWT(account)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("JWT token:",tokenString)
+
 	return WriteJSON(w, http.StatusOK, account)
 }
 
@@ -141,6 +152,83 @@ func WriteJSON(w http.ResponseWriter, status int, v any) error{
 	return json.NewEncoder(w).Encode(v)
 }
 
+func createJWT (account *Account) (string, error){
+
+	secret := os.Getenv("JWT_SECRET")
+
+	// Create the Claims
+	claims := &jwt.MapClaims{
+	"expiresAt": 		jwt.NewNumericDate(time.Unix(1516239022, 0)),
+	"accountNumber": 	account.Number,
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	return token.SignedString([]byte(secret))
+}
+
+func permissionDeniend(w http.ResponseWriter) {
+	WriteJSON(w, http.StatusForbidden, ApiError{Error: "permission denied"})
+
+}
+
+func withJWTAuth(handlerFunc http.HandlerFunc, s Storage) http.HandlerFunc {
+
+	return func(w http.ResponseWriter, r *http.Request){
+	fmt.Println("calling JWT auth middleware")
+
+	tokenString := r.Header.Get("x-jwt-token")
+
+	token, err :=validateJWT(tokenString)
+
+	if err != nil {
+		permissionDeniend(w)
+		return
+	}
+
+	if !token.Valid {
+		permissionDeniend(w)
+		return
+	}
+
+	userID, err := getID(r)
+	if err != nil {
+		permissionDeniend(w)
+		return
+	}
+
+	
+	account, err := s.GetAccountByID(userID)
+	if err != nil {
+		permissionDeniend(w)
+		return
+	}
+
+	claims := token.Claims.(jwt.MapClaims)
+
+	if account.Number != int64(claims["accountNumber"].(float64)){
+		permissionDeniend(w)
+		return
+	}
+
+
+		handlerFunc(w, r)
+	}
+}
+
+
+
+func validateJWT(tokenString string) (*jwt.Token, error) {
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+
+	return jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return []byte(jwtSecret), nil
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
+	
+
+}
+
 type apiFunc func(http.ResponseWriter, *http.Request) error
 
 type ApiError struct {
@@ -169,3 +257,5 @@ func getID(r *http.Request) (int, error) {
 	return id, nil
 
 }
+
+// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2NvdW50TnVtYmVyIjo4MTM2NTI3NCwiZXhwaXJlc0F0IjoxNTE2MjM5MDIyfQ.Uerenr4PNA_KgmeEuZh6Ko_esuiYN-Ugh3OI1Hk7TOM

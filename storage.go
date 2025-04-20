@@ -67,7 +67,7 @@ func (s *PostgresStore) CreateAccount(acc *Account)error{
 	values 
 	($1, $2, $3, $4, $5)
 	`
-	res, err := s.db.Query(
+	_, err := s.db.Query(
 		query, 
 		acc.FirstName, 
 		acc.LastName, 
@@ -78,7 +78,7 @@ func (s *PostgresStore) CreateAccount(acc *Account)error{
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%v\n", res)
+	// fmt.Printf("%v\n", res)
 	return nil
 }
 

@@ -293,5 +293,3 @@ func getID(r *http.Request) (int, error) {
 	return id, nil
 
 }
-
-// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2NvdW50TnVtYmVyIjo4MTM2NTI3NCwiZXhwaXJlc0F0IjoxNTE2MjM5MDIyfQ.Uerenr4PNA_KgmeEuZh6Ko_esuiYN-Ugh3OI1Hk7TOM
